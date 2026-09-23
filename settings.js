@@ -179,7 +179,7 @@ function renderServers() {
     return;
   }
   for (const s of sorted) {
-    list.appendChild(buildServerRow(s, { testFn: testServer, urlLabel: x => x.url, unit: 'file', subFallback: () => null, rerender: renderServers }));
+    list.appendChild(buildServerRow(s, { testFn: testServer, urlLabel: x => x.name ? `${x.name} — ${x.url}` : x.url, unit: 'file', subFallback: () => null, rerender: renderServers }));
   }
 }
 
@@ -200,7 +200,7 @@ function renderMediaServers() {
   for (const s of sorted) {
     list.appendChild(buildServerRow(s, {
       testFn: testEmbyServer,
-      urlLabel: x => `${x.serverName || serverLabel(x.url)} — ${x.url}`,
+      urlLabel: x => x.name ? `${x.name} — ${x.url}` : `${x.serverName || serverLabel(x.url)} — ${x.url}`,
       unit: 'item',
       subFallback: x => `signed in as ${x.username || 'unknown user'}`,
       rerender: renderMediaServers
@@ -222,15 +222,15 @@ async function persistServers() {
   try { await chrome.runtime.sendMessage({ type: 'SYNC_RULES' }); } catch (e) { /* worker will sync on storage change */ }
 }
 
-async function addServer(raw) {
+async function addServer(raw, customName) {
   const input = String(raw || '').trim();
   if (!input) return;
   if (/^ftp:\/\//i.test(input)) {
-    toast('Chrome cannot read ftp:// URLs. Use the server\'s http:// address instead.', { kind: 'err', ttl: 7000 });
-    return;
+    toast('FTP is supported natively in OmniStream Desktop! Run index to scan.', { kind: 'ok', ttl: 4000 });
   }
+
   const url = normalizeServerUrl(input);
-  if (!url) { toast('That doesn\'t look like a valid http(s) URL.', { kind: 'err' }); return; }
+  if (!url) { toast('That doesn\'t look like a valid URL.', { kind: 'err' }); return; }
   if (servers.some(s => s.url === url)) { toast('That server is already in the list.'); return; }
 
   if (HAS_EXT) {
@@ -245,14 +245,14 @@ async function addServer(raw) {
     }
   }
 
-  servers.push({ url, enabled: true, addedAt: Date.now() });
+  servers.push({ url, name: customName || undefined, enabled: true, addedAt: Date.now() });
   await persistServers();
   renderServers();
   $('addInput').value = '';
   toast('Server added. Run "Update index" in the library to crawl it.', { kind: 'ok' });
 }
 
-async function addPageServer(raw) {
+async function addPageServer(raw, customName) {
   const input = String(raw || '').trim();
   if (!input) return;
   const url = normalizePageUrl(input);
@@ -265,7 +265,7 @@ async function addPageServer(raw) {
     if (!granted) toast(`Added, but without permission to read ${new URL(url).host} the crawl will fail. Re-add to try again.`, { kind: 'err', ttl: 8000 });
   }
 
-  servers.push({ url, type: 'page', enabled: true, addedAt: Date.now() });
+  servers.push({ url, name: customName || undefined, type: 'page', enabled: true, addedAt: Date.now() });
   await persistServers();
   renderPageServers();
   $('pageAddInput').value = '';
@@ -289,7 +289,7 @@ function renderPageServers() {
   for (const s of sorted) {
     list.appendChild(buildServerRow(s, {
       testFn: testPageServer,
-      urlLabel: x => x.url,
+      urlLabel: x => x.name ? `${x.name} — ${x.url}` : x.url,
       unit: 'item',
       subFallback: () => null,
       rerender: renderPageServers
@@ -331,8 +331,19 @@ async function requestOrigin(url) {
 }
 
 async function editServer(s) {
+  const newName = prompt('Edit display name (optional):', s.name || '');
+  if (newName !== null) s.name = newName.trim() || undefined;
+
   const newUrl = prompt('Edit server URL:', s.url);
-  if (!newUrl || newUrl === s.url) return;
+  if (!newUrl || newUrl === s.url) {
+    if (newName !== null) {
+      await persistServers();
+      renderServers();
+      renderMediaServers();
+      renderPageServers();
+    }
+    return;
+  }
   
   let url;
   if (s.type === 'emby') {
@@ -575,7 +586,7 @@ async function detectServerType(rawUrl, username, password, apiKey) {
   return 'dir';
 }
 
-async function handleAddEmbyServer(rawUrl, username, password, apiKey) {
+async function handleAddEmbyServer(rawUrl, username, password, apiKey, customName) {
   if (!HAS_EXT) { toast('Open this page from the extension to add a media server.', { kind: 'err' }); return; }
   const url = normalizeEmbyBaseUrl(rawUrl);
   if (!url) { toast('Invalid Media Server URL.', { kind: 'err' }); return; }
@@ -606,6 +617,7 @@ async function handleAddEmbyServer(rawUrl, username, password, apiKey) {
 
   servers.push({
     url: res.url, type: 'emby', enabled: true,
+    name: customName || undefined,
     apiKey: res.apiKey, userId: res.userId,
     serverName: res.serverName, serverVersion: res.serverVersion, username: res.username,
     addedAt: Date.now()
@@ -678,6 +690,7 @@ function bind() {
     if (!rawUrl) { toast('Enter a server address.', { kind: 'err' }); return; }
     
     const typeChoice = $('unifiedServerType').value;
+    const customName = $('unifiedNameInput').value.trim();
     const username = $('embyUsername').value.trim();
     const password = $('embyPassword').value;
     const apiKey = $('embyApiKey').value.trim();
@@ -694,13 +707,14 @@ function bind() {
       }
       
       if (type === 'emby') {
-        await handleAddEmbyServer(rawUrl, username, password, apiKey);
+        await handleAddEmbyServer(rawUrl, username, password, apiKey, customName);
       } else if (type === 'page') {
-        await addPageServer(rawUrl);
+        await addPageServer(rawUrl, customName);
       } else {
-        await addServer(rawUrl);
+        await addServer(rawUrl, customName);
       }
       $('unifiedAddInput').value = '';
+      $('unifiedNameInput').value = '';
     } catch (err) {
       toast('Failed to add server: ' + err.message, { kind: 'err' });
     } finally {

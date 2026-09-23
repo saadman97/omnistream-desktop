@@ -231,7 +231,16 @@ function send(msg) {
 /* Library loading                                                     */
 /* ------------------------------------------------------------------ */
 
+function decodeName(s) {
+  if (!s) return s;
+  try { return decodeURIComponent(s.replace(/\+/g, '%20')); } catch(e) { return s; }
+}
+
 function prepare(f) {
+  f.filename = decodeName(f.filename);
+  if (f.folder) f.folder = decodeName(f.folder);
+  if (f.episodes) f.episodes.forEach(e => { e.filename = decodeName(e.filename); });
+
   f._q = (f.filename + ' ' + (f.folder || '')).toLowerCase();
   f._serverLower = (f.server_name || '').toLowerCase();
   f._m = null;
@@ -684,6 +693,11 @@ function makeActivatable(node, f) {
   });
 }
 
+function serverDisplayName(rawName) {
+  const s = state.servers.find(x => serverLabel(x.url) === rawName);
+  return s && s.name ? s.name : rawName;
+}
+
 function buildCard(f, i) {
   const node = els.cardTpl.content.firstElementChild.cloneNode(true);
   const kind = kindOf(f);
@@ -698,7 +712,7 @@ function buildCard(f, i) {
 
   node.querySelector('.card-title').textContent = f.filename;
   node.querySelector('.card-title').title = f.filename;
-  node.querySelector('.server').textContent = f.server_name;
+  node.querySelector('.server').textContent = serverDisplayName(f.server_name);
   const folder = node.querySelector('.folder');
   const folderName = f.type === 'Folder' ? '' : (f.folder || '');
   if (folderName && folderName !== f.filename) { folder.textContent = folderName; folder.title = folderName; folder.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0'; }
@@ -718,8 +732,8 @@ function buildRow(f) {
   node.querySelector('.row-title').title = f.filename;
   node.querySelector('.row-title-text').textContent = f.filename;
   node.querySelector('.row-sub').textContent = f.type === 'Folder'
-    ? `${f.server_name} · ${f.episodes.length} episodes`
-    : `${f.server_name} · ${f.folder || ''}`;
+    ? `${serverDisplayName(f.server_name)} · ${f.episodes.length} episodes`
+    : `${serverDisplayName(f.server_name)} · ${f.folder || ''}`;
   const k = node.querySelector('.kind');
   k.textContent = kind; k.dataset.kind = kind;
   node.querySelector('.size').textContent = formatBytes(f.size_bytes);
@@ -836,7 +850,7 @@ function renderRack() {
     const name = serverLabel(s.url);
     if (names.has(name)) continue;
     names.add(name);
-    rows.push({ name, enabled: s.enabled !== false, url: s.url });
+    rows.push({ name, displayName: s.name || name, enabled: s.enabled !== false, url: s.url });
   }
 
   els.rackCount.textContent = rows.length ? String(rows.length) : '';
@@ -849,8 +863,8 @@ function renderRack() {
     let stateName = r.enabled ? (count ? 'indexed' : 'idle') : 'disabled';
     if (live) stateName = live.status;
     lamp.dataset.state = stateName;
-    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = r.name;
-    nm.title = r.orphan ? `${r.name} — no longer configured` : r.url;
+    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = r.displayName;
+    nm.title = r.orphan ? `${r.displayName} — no longer configured` : r.url;
     const c = document.createElement('span'); c.className = 'count';
     c.textContent = live && state.crawling ? formatNumber(live.files) : (count ? formatNumber(count) : (r.enabled ? '—' : 'off'));
     b.append(lamp, nm, c);

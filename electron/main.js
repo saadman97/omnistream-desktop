@@ -165,8 +165,8 @@ function openSettingsWindow() {
 // Create or focus Player window
 function openPlayerWindow(urlParams = {}) {
   const queryParts = [];
-  if (urlParams.url) queryParts.push(`v=${encodeURIComponent(urlParams.url)}`);
-  if (urlParams.folderUrl) queryParts.push(`folder=${encodeURIComponent(urlParams.folderUrl)}`);
+  if (urlParams.url) queryParts.push(`src=${encodeURIComponent(urlParams.url)}`);
+  if (urlParams.folderUrl) queryParts.push(`parent=${encodeURIComponent(urlParams.folderUrl)}`);
   const queryString = queryParts.length ? `?${queryParts.join('&')}` : '';
 
   if (playerWindow && !playerWindow.isDestroyed()) {
