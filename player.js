@@ -1,5 +1,5 @@
 /*
- * player.js — in-extension video player with a folder playlist.
+ * player.js — desktop Electron video player with a folder playlist.
  * URL: player.html?src=<file url>&parent=<directory url>
  */
 'use strict';
@@ -13,14 +13,19 @@ let playlist = [];
 let current = null;
 let currentHls = null;
 let currentDash = null;
+let plyrInstance = null;
 
 function isSupportedMediaUrl(s) {
-  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'ftp:' || u.protocol === 'ftps:'; } catch (e) { return false; }
+  try {
+    const u = new URL(s);
+    return ['http:', 'https:', 'ftp:', 'ftps:'].includes(u.protocol);
+  } catch (e) { return false; }
 }
 
 async function init() {
   const src = params.get('src') || params.get('v');
   const parent = params.get('parent') || params.get('folder');
+
   if (!src || !isSupportedMediaUrl(src)) {
     $('title').textContent = 'No video selected';
     $('fail').classList.remove('hidden');
@@ -28,7 +33,8 @@ async function init() {
     return;
   }
 
-  if (parent && isHttpUrl(parent)) {
+  // Load folder playlist from IndexedDB for both HTTP and FTP parents
+  if (parent && isSupportedMediaUrl(parent)) {
     try {
       const db = await openDB();
       const tx = db.transaction(STORE_FILES, 'readonly');
@@ -38,12 +44,21 @@ async function init() {
         .sort((a, b) => collator.compare(a.filename, b.filename));
     } catch (e) { console.warn('playlist unavailable', e); }
   }
+
   if (playlist.length < 2) {
     $('page').classList.add('solo');
     $('playlist').classList.add('hidden');
     $('prevBtn').classList.add('hidden');
     $('nextBtn').classList.add('hidden');
     $('autoNext').parentElement.classList.add('hidden');
+  }
+
+  if (!plyrInstance) {
+    plyrInstance = new Plyr(video, {
+      keyboard: { focused: false, global: false },
+      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
+      settings: ['captions', 'quality', 'speed', 'loop']
+    });
   }
 
   const found = playlist.find(f => f.full_url === src);
@@ -58,7 +73,7 @@ function decodeName(url) {
 function load(file) {
   current = file;
   const name = file.filename || decodeName(file.full_url);
-  document.title = `${name} · Vault`;
+  document.title = `${name} · OmniStream`;
   $('title').textContent = name;
   $('title').title = file.full_url;
   $('sub').textContent = [file.server_name, file.size_bytes ? formatBytes(file.size_bytes) : null, file.ext ? file.ext.toUpperCase() : null].filter(Boolean).join(' · ');
@@ -71,24 +86,27 @@ function load(file) {
   if (currentHls) { currentHls.destroy(); currentHls = null; }
   if (currentDash) { currentDash.reset(); currentDash = null; }
 
-  const url = file.full_url;
-  const ext = url.split('.').pop().toLowerCase();
-  const playbackUrl = resolveMediaUrl(url);
+  const rawUrl = file.full_url;
+  const playbackUrl = resolveMediaUrl(rawUrl);
+  const ext = rawUrl.split('.').pop().toLowerCase().split('?')[0].split('#')[0];
 
-  if (typeof Hls !== 'undefined' && Hls.isSupported() && (ext.startsWith('m3u') || url.includes('.m3u'))) {
-    currentHls = new Hls();
+  if (typeof Hls !== 'undefined' && Hls.isSupported() && (ext.startsWith('m3u') || rawUrl.includes('.m3u'))) {
+    currentHls = new Hls({ enableWorker: false });
     currentHls.loadSource(playbackUrl);
     currentHls.attachMedia(video);
-  } else if (typeof dashjs !== 'undefined' && (ext.startsWith('mpd') || url.includes('.mpd'))) {
+    window.hls = currentHls;
+  } else if (typeof dashjs !== 'undefined' && (ext === 'mpd' || rawUrl.includes('.mpd'))) {
     currentDash = dashjs.MediaPlayer().create();
     currentDash.initialize(video, playbackUrl, true);
+    window.dash = currentDash;
   } else {
     video.src = playbackUrl;
   }
-  const saved = parseFloat(localStorage.getItem('vault.pos:' + file.full_url) || '0');
+
+  const saved = parseFloat(localStorage.getItem('omnistream.pos:' + rawUrl) || '0');
   if (saved > 5) {
     video.addEventListener('loadedmetadata', () => {
-      if (current !== file) return; // another file was loaded before metadata arrived
+      if (current !== file) return;
       if (isFinite(video.duration) && saved < video.duration - 10) video.currentTime = saved;
     }, { once: true });
   }
@@ -130,38 +148,51 @@ function step(delta) {
 }
 
 function bind() {
-  const backBtn = $('backBtn');
-  if (backBtn && typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openBrowser === 'function') {
-    backBtn.addEventListener('click', (e) => {
-      e.preventDefault();
+  $('backBtn').addEventListener('click', e => {
+    e.preventDefault();
+    // Focus the library window via electronAPI
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openBrowser === 'function') {
       window.electronAPI.openBrowser();
-    });
-  }
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = 'browser.html';
+    }
+  });
 
   $('prevBtn').addEventListener('click', () => step(-1));
   $('nextBtn').addEventListener('click', () => step(1));
-  
+
   $('externalBtn').addEventListener('click', () => {
     if (!current) return;
+    // Use native shell to open in the system's default media player
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+      window.electronAPI.openExternal(current.full_url);
+      toast('Opening in default media player…', { kind: 'ok' });
+      return;
+    }
+    // Fallback: generate .m3u
     const m3u = `#EXTM3U\n#EXTINF:-1,${current.filename}\n${current.full_url}\n`;
     const blob = new Blob([m3u], { type: 'audio/x-mpegurl' });
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = blobUrl;
     a.download = `${current.filename || 'stream'}.m3u`;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
     toast('Playlist generated. Open it to play in your default media player.', { kind: 'ok' });
   });
 
-  // The download attribute is ignored cross-origin; use the downloads API when available.
-  const HAS_DL = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.downloads;
   for (const id of ['dlBtn', 'failDl']) {
     $(id).addEventListener('click', async e => {
-      if (!HAS_DL || !current) return;
+      if (!current) return;
       e.preventDefault();
       try {
-        await chrome.downloads.download({ url: current.full_url, filename: (current.filename || decodeName(current.full_url)).replace(/[\\/:*?"<>|]/g, '_'), conflictAction: 'uniquify' });
+        await chrome.downloads.download({
+          url: current.full_url,
+          filename: (current.filename || decodeName(current.full_url)).replace(/[\\/:*?"<>|]/g, '_'),
+          conflictAction: 'uniquify'
+        });
         toast('Download started', { kind: 'ok' });
       } catch (err) { toast('Download failed: ' + err.message, { kind: 'err' }); }
     });
@@ -173,18 +204,22 @@ function bind() {
 
   video.addEventListener('error', () => {
     const code = video.error ? video.error.code : 0;
+    const isFtp = current && /^ftps?:\/\//i.test(current.full_url);
     const isStream = current && /\.(m3u8|mpd)(?:[?#]|$)/i.test(current.full_url);
     $('fail').classList.remove('hidden');
-    if (isStream) {
-      $('failText').textContent = 'This HLS/DASH stream (.m3u8 / .mpd) requires an HLS player or external media player like VLC. Copy the stream link or open raw stream.';
+    if (isFtp) {
+      $('failText').textContent = 'FTP stream failed. The local proxy may not be running or the FTP server is unreachable. Try "Play Externally" or download the file.';
+    } else if (isStream) {
+      $('failText').textContent = 'This HLS/DASH stream (.m3u8 / .mpd) requires an external media player like VLC. Copy the stream link or use "Play Externally".';
     } else if (code === 2) {
       $('failText').textContent = 'The server stopped sending data. Check that it is reachable, then reload.';
     } else if (code === 4) {
-      $('failText').textContent = 'This container or codec is not supported by Chrome\'s built-in player (common with AVI, WMV and some MKV audio tracks). Open the raw file or download it and play it in VLC.';
+      $('failText').textContent = 'This container or codec is not supported (common with AVI, WMV and some MKV audio tracks). Download and play in VLC.';
     } else {
-      $('failText').textContent = 'Playback failed. Open the raw file or download it instead.';
+      $('failText').textContent = 'Playback failed. Try downloading the file or opening it externally.';
     }
   });
+
   video.addEventListener('playing', () => $('fail').classList.add('hidden'));
   video.addEventListener('ended', () => { if ($('autoNext').checked) step(1); });
 
@@ -193,10 +228,11 @@ function bind() {
     const now = Date.now();
     if (now - lastSave < 3000 || !current) return;
     lastSave = now;
+    const key = 'omnistream.pos:' + current.full_url;
     if (video.duration && video.currentTime > 5 && video.currentTime < video.duration - 10) {
-      localStorage.setItem('vault.pos:' + current.full_url, String(video.currentTime));
+      localStorage.setItem(key, String(video.currentTime));
     } else if (video.duration && video.currentTime >= video.duration - 10) {
-      localStorage.removeItem('vault.pos:' + current.full_url);
+      localStorage.removeItem(key);
     }
   });
 
@@ -212,9 +248,10 @@ function bind() {
       case 'ArrowUp': e.preventDefault(); video.volume = Math.min(1, video.volume + 0.05); break;
       case 'ArrowDown': e.preventDefault(); video.volume = Math.max(0, video.volume - 0.05); break;
       case 'm': video.muted = !video.muted; break;
-      case 'f': document.fullscreenElement ? document.exitFullscreen() : video.requestFullscreen(); break;
+      case 'f': document.fullscreenElement ? document.exitFullscreen() : (plyrInstance ? plyrInstance.fullscreen.enter() : video.requestFullscreen()); break;
       case 'n': step(1); break;
       case 'p': step(-1); break;
+      case 'v': if (plyrInstance) plyrInstance.toggleCaptions(); break;
     }
   });
 }

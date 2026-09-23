@@ -388,10 +388,15 @@ function setupIpcHandlers() {
     if (url.includes('settings.html')) {
       openSettingsWindow();
     } else if (url.includes('player.html')) {
-      const parsed = new URL(url, 'http://localhost');
-      const v = parsed.searchParams.get('v');
-      const folder = parsed.searchParams.get('folder');
-      openPlayerWindow({ url: v, folderUrl: folder });
+      try {
+        const parsed = new URL(url, 'http://localhost');
+        // Support both old (v/folder) and new (src/parent) param names
+        const v = parsed.searchParams.get('src') || parsed.searchParams.get('v');
+        const folder = parsed.searchParams.get('parent') || parsed.searchParams.get('folder');
+        openPlayerWindow({ url: v, folderUrl: folder });
+      } catch (e) {
+        openPlayerWindow();
+      }
     } else if (url.includes('browser.html')) {
       createMainWindow();
     } else {
