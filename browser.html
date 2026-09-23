@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniStream</title>
+  <script>
+    if ((typeof process !== 'undefined' && process.platform === 'darwin') || (navigator.userAgent.includes('Electron') && /Mac/i.test(navigator.platform || navigator.userAgent))) {
+      document.documentElement.classList.add('is-electron', 'is-mac');
+    }
+  </script>
   <link href="browser.css" rel="stylesheet">
 </head>
 <body>
@@ -12,13 +17,13 @@
 
   <!-- Header -->
   <header class="header">
-    <a class="brand" href="browser.html" title="OmniStream">
+    <div class="brand" title="OmniStream">
       <span class="brand-lamp" aria-hidden="true"></span>
       <span>
         <div class="brand-name">OMNISTREAM</div>
         <div class="brand-sub" id="brandSub">media directory browser</div>
       </span>
-    </a>
+    </div>
 
     <div class="search">
       <span class="search-prompt" aria-hidden="true">›</span>
@@ -29,6 +34,9 @@
       </button>
       <div class="search-history hidden" id="searchHistory" role="listbox" aria-label="Recent searches"></div>
     </div>
+
+    <!-- Flexible Draggable Window Region -->
+    <div class="drag-spacer" aria-hidden="true"></div>
 
     <div class="header-right">
       <button class="btn btn-sm" id="liveStreamBtn" title="Play a direct stream URL">Play Stream</button>

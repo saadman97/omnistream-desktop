@@ -4,13 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniStream · Player</title>
+  <script>
+    if ((typeof process !== 'undefined' && process.platform === 'darwin') || (navigator.userAgent.includes('Electron') && /Mac/i.test(navigator.platform || navigator.userAgent))) {
+      document.documentElement.classList.add('is-electron', 'is-mac');
+    }
+  </script>
   <link href="browser.css" rel="stylesheet">
 </head>
 <body>
 <div class="player-page" id="page">
   <header class="player-head">
     <a class="btn btn-ghost btn-sm" href="browser.html" id="backBtn" title="Back to library">← Library</a>
-    <div style="min-width:0;flex:1">
+    <div class="player-drag-spacer" style="min-width:0;flex:1">
       <div class="title" id="title">Loading…</div>
       <div class="sub" id="sub"></div>
     </div>

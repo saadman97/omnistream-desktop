@@ -81,6 +81,7 @@ function createMainWindow() {
     title: 'OmniStream',
     backgroundColor: '#0d0f12',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 18 } : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false,
@@ -89,12 +90,44 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '../browser.html'));
+  attachWindowOpenHandler(mainWindow);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
     if (process.platform !== 'darwin') {
       app.quit();
     }
+  });
+}
+
+// Attach standard link interception to all windows
+function attachWindowOpenHandler(win) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (!url) return { action: 'deny' };
+    if (url.includes('settings.html')) {
+      openSettingsWindow();
+      return { action: 'deny' };
+    }
+    if (url.includes('player.html')) {
+      try {
+        const parsed = new URL(url, 'http://localhost');
+        const v = parsed.searchParams.get('src') || parsed.searchParams.get('v');
+        const folder = parsed.searchParams.get('parent') || parsed.searchParams.get('folder');
+        openPlayerWindow({ url: v, folderUrl: folder });
+      } catch (e) {
+        openPlayerWindow();
+      }
+      return { action: 'deny' };
+    }
+    if (url.includes('browser.html')) {
+      createMainWindow();
+      return { action: 'deny' };
+    }
+    if (/^https?:\/\//i.test(url) || /^ftps?:\/\//i.test(url) || /^mailto:/i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 }
 
@@ -113,6 +146,7 @@ function openSettingsWindow() {
     title: 'OmniStream Settings',
     backgroundColor: '#0d0f12',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 18 } : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false,
@@ -121,6 +155,7 @@ function openSettingsWindow() {
   });
 
   settingsWindow.loadFile(path.join(__dirname, '../settings.html'));
+  attachWindowOpenHandler(settingsWindow);
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
@@ -148,6 +183,7 @@ function openPlayerWindow(urlParams = {}) {
     title: 'OmniStream Player',
     backgroundColor: '#000000',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 18 } : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false,
@@ -156,6 +192,7 @@ function openPlayerWindow(urlParams = {}) {
   });
 
   playerWindow.loadFile(path.join(__dirname, '../player.html'), { search: queryString });
+  attachWindowOpenHandler(playerWindow);
 
   playerWindow.on('closed', () => {
     playerWindow = null;

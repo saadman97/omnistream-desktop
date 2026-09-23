@@ -130,6 +130,14 @@ function step(delta) {
 }
 
 function bind() {
+  const backBtn = $('backBtn');
+  if (backBtn && typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openBrowser === 'function') {
+    backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.electronAPI.openBrowser();
+    });
+  }
+
   $('prevBtn').addEventListener('click', () => step(-1));
   $('nextBtn').addEventListener('click', () => step(1));
   

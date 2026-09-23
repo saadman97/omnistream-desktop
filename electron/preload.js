@@ -10,6 +10,27 @@ try {
   }).catch(() => {});
 }
 
+// Apply desktop and OS classes immediately for layout styling
+function applyDesktopClasses() {
+  const root = document.documentElement;
+  if (root) {
+    root.classList.add('is-electron');
+    if (process.platform === 'darwin') root.classList.add('is-mac');
+    if (process.platform === 'win32') root.classList.add('is-windows');
+  }
+  if (document.body) {
+    document.body.classList.add('is-electron');
+    if (process.platform === 'darwin') document.body.classList.add('is-mac');
+    if (process.platform === 'win32') document.body.classList.add('is-windows');
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', applyDesktopClasses);
+} else {
+  applyDesktopClasses();
+}
+
 /**
  * Resolves any media URL. If it is an FTP/FTPS URL, maps it to the internal
  * loopback streaming proxy so HTML5 <video> can scrub and stream with byte-range requests.

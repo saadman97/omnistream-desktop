@@ -4,9 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniStream · Settings</title>
+  <script>
+    if ((typeof process !== 'undefined' && process.platform === 'darwin') || (navigator.userAgent.includes('Electron') && /Mac/i.test(navigator.platform || navigator.userAgent))) {
+      document.documentElement.classList.add('is-electron', 'is-mac');
+    }
+  </script>
   <link href="browser.css" rel="stylesheet">
 </head>
 <body class="settings-page">
+<div class="settings-drag-bar" aria-hidden="true"></div>
 <div class="settings">
 
   <div class="settings-head">

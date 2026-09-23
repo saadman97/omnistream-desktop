@@ -107,17 +107,64 @@ img, video, svg { display: block; max-width: 100%; }
   grid-area: header;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   padding: 0 18px 0 16px;
   background: var(--ink-1);
   border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  user-select: none;
 }
+
+/* macOS Electron traffic light clearance — guarantees zero overlap */
+.is-mac .header {
+  padding-left: 88px;
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: calc(var(--sidebar-w) - 16px);
+  -webkit-app-region: drag;
+  cursor: default;
 }
+
+.is-mac .brand {
+  min-width: 0;
+  margin-right: 12px;
+}
+
+.brand,
+.brand * {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.drag-spacer {
+  flex: 1;
+  min-width: 32px;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+/* Non-draggable interactive controls in header */
+.header button,
+.header a,
+.header input,
+.header select,
+.header .search,
+.header .search *,
+.header .btn,
+.header .search-prompt,
+.header .search-hint,
+.header .search-clear,
+.header .search-history,
+.header-right button,
+.header-right a,
+.header-right .btn {
+  -webkit-app-region: no-drag;
+}
+
 .brand-lamp {
   width: 14px; height: 14px;
   border-radius: 4px;
@@ -1058,11 +1105,33 @@ kbd {
 @keyframes toastin { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- settings page ---------- */
+.settings-drag-bar {
+  display: none;
+}
+
+.is-mac .settings-drag-bar {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42px;
+  background: var(--ink-1);
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  user-select: none;
+  z-index: 100;
+}
+
 .settings-page { overflow: auto; }
 .settings {
   max-width: 860px;
   margin: 0 auto;
   padding: 32px 24px 80px;
+}
+.is-mac .settings {
+  padding-top: 24px;
 }
 .settings-head {
   display: flex;
@@ -1196,6 +1265,27 @@ kbd {
   padding: 10px 16px;
   background: var(--ink-1);
   border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.is-mac .player-head {
+  padding-left: 88px;
+}
+
+.player-head button,
+.player-head a,
+.player-head input,
+.player-head label,
+.player-head .btn {
+  -webkit-app-region: no-drag;
+}
+
+.player-head .title,
+.player-head .sub,
+.player-drag-spacer {
+  -webkit-app-region: drag;
+  cursor: default;
 }
 .player-head .title { font-family: var(--font-mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .player-head .sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); }

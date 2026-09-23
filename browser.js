@@ -661,7 +661,11 @@ function buildActions(f, container, node) {
 function primaryAction(f) {
   if (f.type === 'Folder') return openFolder(f);
   if (f.file_type_category === 'Video' && PLAYABLE_EXT.has(f.ext)) return play(f, f.parent_url);
-  window.open(f.full_url, '_blank', 'noopener');
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+    window.electronAPI.openExternal(f.full_url);
+  } else {
+    window.open(f.full_url, '_blank', 'noopener');
+  }
 }
 
 function primaryLabel(f) {
@@ -1126,7 +1130,12 @@ function bindEvents() {
   
   els.liveStreamBtn.addEventListener('click', () => {
     const url = prompt('Enter a live stream URL (M3U8, DASH, etc.):');
-    if (url) window.open('player.html?src=' + encodeURIComponent(url));
+    if (!url) return;
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openPlayer === 'function') {
+      window.electronAPI.openPlayer(url, '');
+    } else {
+      window.open('player.html?src=' + encodeURIComponent(url));
+    }
   });
 
   els.importPlaylistBtn.addEventListener('click', () => els.playlistFileInput.click());
