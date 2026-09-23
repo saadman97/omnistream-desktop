@@ -6,9 +6,12 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --dir",
+    "build:app": "electron-builder --mac --dir --arm64",
+    "open:app": "open dist/mac-arm64/OmniStream.app",
+    "app": "npm run build:app && npm run open:app",
+    "dist:dmg": "electron-builder --mac dmg --arm64",
+    "dist:mac": "electron-builder --mac --arm64",
     "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
     "test": "node test/test-ftp.js"
   },
   "keywords": [

@@ -16,25 +16,26 @@ files:
 mac:
   category: public.app-category.video
   target:
+    - target: dir
+      arch:
+        - arm64
     - target: dmg
       arch:
-        - universal
         - arm64
         - x64
     - target: zip
       arch:
-        - universal
         - arm64
         - x64
-  icon: icons/icon128.png
-  hardenedRuntime: true
+  icon: icons/icon512.png
+  hardenedRuntime: false
   gatekeeperAssess: false
 
 win:
   target:
     - nsis
     - portable
-  icon: icons/icon128.png
+  icon: icons/icon512.png
 
 linux:
   target:
