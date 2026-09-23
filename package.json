@@ -19,8 +19,24 @@
     "app": "npm run build:app && npm run open:app",
     "dist:dmg": "electron-builder --mac dmg --arm64",
     "dist:mac": "electron-builder --mac --arm64",
+    "dist:win:portable": "electron-builder --win portable --x64",
     "dist": "electron-builder",
     "test": "node test/test-ftp.js"
+  },
+  "build": {
+    "appId": "com.omnistream.desktop",
+    "productName": "OmniStream",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": ["portable"],
+      "icon": "icons/icon.ico"
+    },
+    "mac": {
+      "category": "public.app-category.video",
+      "target": ["dmg"]
+    }
   },
   "keywords": [
     "omnistream",

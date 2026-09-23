@@ -335,8 +335,9 @@ function startFtpStreamingProxy() {
       }
     });
 
-    // Listen on loopback interface with ephemeral port
-    server.listen(0, '127.0.0.1', () => {
+    // Listen on loopback interface with fixed port for extension interoperability
+    const FTP_PROXY_PORT = 8999;
+    server.listen(FTP_PROXY_PORT, '127.0.0.1', () => {
       const address = server.address();
       const port = address.port;
       console.log(`[OmniStream] FTP streaming proxy listening on http://127.0.0.1:${port}`);
