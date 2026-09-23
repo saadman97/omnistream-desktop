@@ -14,14 +14,14 @@ let current = null;
 let currentHls = null;
 let currentDash = null;
 
-function isHttpUrl(s) {
-  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:'; } catch (e) { return false; }
+function isSupportedMediaUrl(s) {
+  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'ftp:' || u.protocol === 'ftps:'; } catch (e) { return false; }
 }
 
 async function init() {
-  const src = params.get('src');
-  const parent = params.get('parent');
-  if (!src || !isHttpUrl(src)) {
+  const src = params.get('src') || params.get('v');
+  const parent = params.get('parent') || params.get('folder');
+  if (!src || !isSupportedMediaUrl(src)) {
     $('title').textContent = 'No video selected';
     $('fail').classList.remove('hidden');
     $('failText').textContent = 'Open a video from the library to play it here.';
@@ -73,16 +73,17 @@ function load(file) {
 
   const url = file.full_url;
   const ext = url.split('.').pop().toLowerCase();
+  const playbackUrl = resolveMediaUrl(url);
 
   if (typeof Hls !== 'undefined' && Hls.isSupported() && (ext.startsWith('m3u') || url.includes('.m3u'))) {
     currentHls = new Hls();
-    currentHls.loadSource(url);
+    currentHls.loadSource(playbackUrl);
     currentHls.attachMedia(video);
   } else if (typeof dashjs !== 'undefined' && (ext.startsWith('mpd') || url.includes('.mpd'))) {
     currentDash = dashjs.MediaPlayer().create();
-    currentDash.initialize(video, url, true);
+    currentDash.initialize(video, playbackUrl, true);
   } else {
-    video.src = url;
+    video.src = playbackUrl;
   }
   const saved = parseFloat(localStorage.getItem('vault.pos:' + file.full_url) || '0');
   if (saved > 5) {

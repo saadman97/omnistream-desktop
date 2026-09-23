@@ -21,13 +21,13 @@
   <section class="panel" id="addServerPanel">
     <h2>Add Server</h2>
     <p class="lead">Add an open directory, Emby/Jellyfin media server, or JS-rendered page. OmniStream can auto-detect the type or you can manually select it.</p>
-    <div class="note">Chrome dropped <code>ftp://</code> support, so enter the server's <strong>http://</strong> or <strong>https://</strong> address. OmniStream will ask for host permission if needed.</div>
+    <div class="note">OmniStream Standalone features native <code>ftp://</code> & <code>ftps://</code> support alongside HTTP open directories and Emby/Jellyfin servers. Directly enter FTP mirrors (e.g. <code>ftp://ftp.example.com/pub/</code> or <code>ftp://user:pass@host/path/</code>).</div>
     <form id="unifiedAddForm" style="margin-top:14px;">
       <div class="add-row" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <input class="input" id="unifiedAddInput" type="text" inputmode="url" placeholder="http://server.example.net/FILE/ or https://emby.example.com" autocomplete="off" spellcheck="false" aria-label="Server URL" style="flex:1; min-width:240px;">
+        <input class="input" id="unifiedAddInput" type="text" inputmode="url" placeholder="http://server.example.net/FILE/ or ftp://ftp.example.com/movies/ or https://emby..." autocomplete="off" spellcheck="false" aria-label="Server URL" style="flex:1; min-width:240px;">
         <select class="input" id="unifiedServerType" aria-label="Server type" style="width:auto; min-width:170px;">
           <option value="auto">Auto-detect Type</option>
-          <option value="dir">Open Directory / Web</option>
+          <option value="dir">Open Directory / FTP / Web</option>
           <option value="emby">Media Server (Emby/Jellyfin)</option>
           <option value="page">Rendered Page (JS/SPA)</option>
         </select>

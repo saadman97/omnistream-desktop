@@ -1,42 +1,61 @@
-# Vault — Open Directory Video Browser
+# OmniStream — Standalone Desktop & Media Directory Browser
 
-A Manifest V3 Chrome extension that turns a set of HTTP open directories (FTP mirrors, index pages) into a fast, searchable local library. It crawls every server concurrently, stores the file list in IndexedDB, and lets you search, filter, and play videos straight in the browser.
+A fast, beautiful media directory, FTP, and video streaming application that turns open directories, media servers, and native FTP servers into a searchable local library. Built as a standalone desktop application with Electron, with native FTP support and seamless in-app video playback.
 
-No build step, no `node_modules`, no frameworks — vanilla JavaScript and hand-written CSS.
+---
 
 ## Features
 
-- **Fast concurrent crawler** — per-host round-robin scheduling keeps every server saturated at Chrome's 6-socket limit instead of hammering one host; request timeouts, retries, depth limits, batched IndexedDB writes.
-- **Stop & resume** — progress is checkpointed; an interrupted crawl can be resumed from where it stopped.
-- **Incremental updates** — the old index stays visible while a new crawl runs; stale entries are removed when it completes.
-- **Instant search** — the whole library lives in memory; filter with prefixes: `ext:mkv`, `is:series`, `is:movie`, `server:ftp4`.
-- **Series grouping** — episodes collapse into one folder card; open it to see every episode.
-- **Lazy thumbnails** — frames are captured from the video as you scroll (throttled, black-frame retry) and cached in IndexedDB.
-- **Built-in player** — `player.html` with a folder playlist, auto-next, resume position and keyboard shortcuts.
-- **Settings page** — add or remove servers (with on-demand host permission), tune crawler limits, thumbnails and library options, export/import the server list, clear data.
+- **Native FTP Support** — Direct connection to `ftp://` and `ftps://` servers (anonymous or with user/password credentials). Crawls directories, extracts file sizes and timestamps, and streams media directly.
+- **Local Range-Streaming Proxy** — Chromium cannot natively play `ftp://` video streams. OmniStream runs an internal loopback proxy with HTTP `206 Partial Content` Range request support, enabling scrubbing, instant seeking, lazy thumbnail generation, and subtitle support on FTP videos.
+- **Fast Concurrent Crawler** — Per-host round-robin scheduling keeps servers saturated while honoring socket limits; supports request timeouts, retries, depth limits, and batched IndexedDB writes.
+- **Stop & Resume** — Progress is checkpointed; interrupted crawls can be resumed from where they stopped.
+- **Instant Search & Filtering** — The whole library lives in memory with instant search and filter prefixes: `ext:mkv`, `is:series`, `is:movie`, `server:ftp4`.
+- **Series Grouping** — Episodes collapse into single folder cards; open to view all episodes.
+- **Lazy Thumbnails** — High-performance frame capture as you scroll, cached locally in IndexedDB.
+- **Built-in Player** — `player.html` with folder playlist, auto-next, resume position, and keyboard shortcuts.
+- **Settings & Server Manager** — Add, remove, and test open directories, FTP mirrors, and Emby/Jellyfin servers.
 
-## Install
+---
 
-1. Open `chrome://extensions/` and enable **Developer mode**.
-2. Click **Load unpacked** and choose this folder.
-3. Click the Vault icon (or press `Alt+Shift+V`) to open the library.
+## Desktop Application (macOS, Windows, Linux)
 
-## Use
+### Run Locally
 
-1. Click **Update index**. The strip under the header shows live progress; the server rack in the sidebar lights up per server.
-2. Search with `/`, pick a category, or click a server to filter. `←` `→` page through results.
-3. Click a card to play (videos) or open (everything else). Hover a card for copy-link, download and open-folder actions.
-4. Open **Settings** (gear icon) to add your own servers. Enter the **http://** address of the directory — Chrome no longer supports `ftp://`.
+```bash
+# Install dependencies
+npm install
 
-## Files
+# Run the standalone desktop app
+npm start
 
-| File | Purpose |
+# Run unit & integration tests
+npm test
+```
+
+### Build & Package Standalone Binaries
+
+```bash
+# Package for macOS (DMG & Zip)
+npm run dist:mac
+
+# Package for current platform
+npm run dist
+```
+
+---
+
+## Architecture & Project Structure
+
+| File / Folder | Purpose |
 | --- | --- |
-| `manifest.json` | MV3 manifest. Host permissions for the default servers plus optional `http://*/*` / `https://*/*` requested when you add a server. |
-| `background.js` | Service worker: crawler, scheduler, checkpoints, dynamic CORS rules. |
-| `shared.js` | Constants, settings/servers storage helpers, IndexedDB helpers. Loaded by the worker (`importScripts`) and every page. |
-| `browser.html/js` | Library UI. |
-| `settings.html/js` | Settings page (also the extension's options page). |
-| `player.html/js` | Video player with playlist. |
-| `browser.css` | The design system shared by all pages. |
-| `rules.json` | Static declarativeNetRequest rules that add CORS headers for the default hosts so thumbnail capture works. |
+| `electron/main.js` | Main process: window management, macOS menu, persistent storage, IPC hub. |
+| `electron/ftp-service.js` | Native FTP engine (`basic-ftp`) & local HTTP 206 Range-streaming proxy server. |
+| `electron/preload.js` | Preload script: desktop API bridge (`window.electronAPI`) & transparent `chrome.*` compatibility layer. |
+| `background.html` / `background.js` | Background crawler service running concurrently with IndexedDB batching and FTP traversal. |
+| `shared.js` | Constants, URL normalization (supporting HTTP, HTTPS, and FTP), and IndexedDB helpers. |
+| `browser.html` / `browser.js` | Main media library UI with grid/list view, filtering, and instant search. |
+| `settings.html` / `settings.js` | Server configuration, FTP server testing, and crawler tuning. |
+| `player.html` / `player.js` | Built-in video player with playlist and HLS/DASH/FTP range streaming support. |
+| `browser.css` | Premium dark mode design system shared across all views. |
+| `test/test-ftp.js` | Automated test suite for FTP parsing, MIME types, and streaming proxy. |

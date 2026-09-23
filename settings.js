@@ -225,15 +225,12 @@ async function persistServers() {
 async function addServer(raw) {
   const input = String(raw || '').trim();
   if (!input) return;
-  if (/^ftp:\/\//i.test(input)) {
-    toast('Chrome cannot read ftp:// URLs. Use the server\'s http:// address instead.', { kind: 'err', ttl: 7000 });
-    return;
-  }
+  const isFtp = /^ftps?:\/\//i.test(input);
   const url = normalizeServerUrl(input);
-  if (!url) { toast('That doesn\'t look like a valid http(s) URL.', { kind: 'err' }); return; }
+  if (!url) { toast('That doesn\'t look like a valid http(s) or ftp URL.', { kind: 'err' }); return; }
   if (servers.some(s => s.url === url)) { toast('That server is already in the list.'); return; }
 
-  if (HAS_EXT) {
+  if (HAS_EXT && !isFtp && !(typeof window !== 'undefined' && window.electronAPI)) {
     let granted = false;
     try {
       granted = await requestOrigin(url);
@@ -248,7 +245,7 @@ async function addServer(raw) {
   servers.push({ url, enabled: true, addedAt: Date.now() });
   await persistServers();
   renderServers();
-  $('addInput').value = '';
+  if ($('addInput')) $('addInput').value = '';
   toast('Server added. Run "Update index" in the library to crawl it.', { kind: 'ok' });
 }
 
@@ -315,6 +312,11 @@ async function testPageServer(s, subEl) {
 
 /** Ask for host access; falls back to a port-less pattern if Chrome rejects the first. */
 async function requestOrigin(url) {
+  if (typeof window !== 'undefined' && window.electronAPI) return true;
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'ftp:' || u.protocol === 'ftps:') return true;
+  } catch (e) { return false; }
   const patterns = [originPattern(url)];
   const u = new URL(url);
   if (u.port) patterns.push(`${u.protocol}//${u.hostname}/*`);
@@ -525,6 +527,7 @@ let embyAuthMode = 'password';
 
 async function detectServerType(rawUrl, username, password, apiKey) {
   if (!rawUrl) return 'dir';
+  if (/^ftps?:\/\//i.test(rawUrl)) return 'dir';
   
   // 1. Check credentials or explicit URL signature patterns
   if (username || password || apiKey) return 'emby';
@@ -733,6 +736,15 @@ function bind() {
     try { await chrome.runtime.sendMessage({ type: 'DISCARD_RESUME' }); toast('Interrupted crawl discarded.', { kind: 'ok' }); }
     catch (e) { toast('Could not reach the background worker: ' + e.message, { kind: 'err' }); }
   });
+
+  const backBtn = $('backBtn');
+  if (backBtn && typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openBrowser === 'function') {
+    backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.electronAPI.openBrowser();
+      window.close();
+    });
+  }
 }
 
 /* ------------------------------------------------------------------ */

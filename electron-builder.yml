@@ -1,0 +1,43 @@
+appId: com.omnistream.app
+productName: OmniStream
+copyright: Copyright © 2026 OmniStream Team
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - "**/*"
+  - "!dist/**"
+  - "!scratch/**"
+  - "!.agents/**"
+  - "!test/**"
+
+mac:
+  category: public.app-category.video
+  target:
+    - target: dmg
+      arch:
+        - universal
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - universal
+        - arm64
+        - x64
+  icon: icons/icon128.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+win:
+  target:
+    - nsis
+    - portable
+  icon: icons/icon128.png
+
+linux:
+  target:
+    - AppImage
+    - tar.gz
+  category: Video

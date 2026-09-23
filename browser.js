@@ -618,7 +618,7 @@ function fillThumb(node, f) {
     img.onload = () => img.classList.add('ready');
     img.onerror = () => img.removeAttribute('src');
   } else if (f.file_type_category === 'Image' && f.type !== 'Folder') {
-    img.src = f.full_url;
+    img.src = resolveMediaUrl(f.full_url);
     img.onload = () => img.classList.add('ready');
   } else {
     const src = thumbSource(f);
@@ -898,8 +898,13 @@ function relativeTime(ts) {
 
 function play(f, parent) {
   if (!f) return;
-  const url = `player.html?src=${encodeURIComponent(f.full_url)}&parent=${encodeURIComponent(parent || f.parent_url || '')}`;
-  window.open(url, '_blank', 'noopener');
+  const parentUrl = parent || f.parent_url || '';
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openPlayer === 'function') {
+    window.electronAPI.openPlayer(f.full_url, parentUrl);
+  } else {
+    const url = `player.html?src=${encodeURIComponent(f.full_url)}&parent=${encodeURIComponent(parentUrl)}`;
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 function openFolder(folder) {
@@ -1110,6 +1115,14 @@ function bindEvents() {
 
   els.updateBtn.addEventListener('click', () => startCrawl());
   els.stopBtn.addEventListener('click', stopCrawl);
+
+  const settingsBtn = $('settingsBtn');
+  if (settingsBtn && typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.openSettings === 'function') {
+    settingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.electronAPI.openSettings();
+    });
+  }
   
   els.liveStreamBtn.addEventListener('click', () => {
     const url = prompt('Enter a live stream URL (M3U8, DASH, etc.):');
@@ -1474,7 +1487,7 @@ const thumbs = {
         } catch (e) { finish(reject, e); }
       });
       v.addEventListener('error', () => finish(reject, new Error(v.error ? `media error ${v.error.code}` : 'media error')));
-      v.src = url;
+      v.src = resolveMediaUrl(url);
     });
   }
 };

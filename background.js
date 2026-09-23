@@ -10,23 +10,31 @@
  *    from user-added servers (thumbnail capture needs CORS headers).
  */
 
-importScripts('shared.js');
+if (typeof importScripts === 'function') {
+  importScripts('shared.js');
+}
 
 /* ------------------------------------------------------------------ */
 /* Action / lifecycle                                                  */
 /* ------------------------------------------------------------------ */
 
-chrome.action.onClicked.addListener(() => openBrowserTab());
+if (typeof chrome !== 'undefined' && chrome.action && chrome.action.onClicked) {
+  chrome.action.onClicked.addListener(() => openBrowserTab());
+}
 
-chrome.runtime.onInstalled.addListener(() => {
-  syncDynamicRules().catch(err => console.warn('Rule sync failed', err));
-});
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.servers) {
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onInstalled) {
+  chrome.runtime.onInstalled.addListener(() => {
     syncDynamicRules().catch(err => console.warn('Rule sync failed', err));
-  }
-});
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.servers) {
+      syncDynamicRules().catch(err => console.warn('Rule sync failed', err));
+    }
+  });
+}
 
 async function openBrowserTab() {
   const url = chrome.runtime.getURL('browser.html');
@@ -365,27 +373,71 @@ async function processDirectory(item, server) {
   let host = null;
   try { host = new URL(item.url).host; } catch (e) { /* unreachable: item.url was already validated when enqueued */ }
   try {
-    const { text: html, url: finalUrl } = await fetchText(item.url);
-    // Redirects are followed, but never out of the server root (unless allowed 1-hop external stream page).
-    if (!finalUrl.startsWith(item.root) && !item.isExternal) throw new Error(`Redirected outside root (${finalUrl})`);
-    if (finalUrl !== item.url) crawl.visited.add(finalUrl);
-    const { files, directories } = parseListing(finalUrl, html, item.root, server ? server.name : serverLabel(item.url));
+    let files = [];
+    let directories = [];
 
-    if (item.isSubpage) {
-      crawl.stats.deepSearches++;
-    }
-
-    if (crawl.settings && crawl.settings.deepStreamResolveEnabled) {
-      const extra = extractStreamLinksFromHtml(finalUrl, html, item.root, server ? server.name : serverLabel(item.url));
-      for (const f of extra.files) {
-        if (!files.some(existing => existing.full_url === f.full_url)) {
-          files.push(f);
+    const isFtp = /^ftps?:\/\//i.test(item.url);
+    if (isFtp) {
+      if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.listFtpDirectory) {
+        const res = await window.electronAPI.listFtpDirectory(item.url);
+        if (!res || !res.ok) {
+          throw new Error(res ? res.error : 'FTP directory listing failed');
         }
+        const relPath = safeDecodeURIComponent(item.url.slice(item.root.length));
+        const dirIsSeries = SERIES_RE.test(relPath);
+        const folderName = safeDecodeURIComponent(item.url.split('/').filter(Boolean).pop() || '');
+        const now = new Date().toISOString();
+
+        files = (res.files || []).map(f => {
+          const ext = fileExtension(f.filename);
+          const category = categorize(ext);
+          let videoType = null;
+          if (category === 'Video') {
+            videoType = (dirIsSeries || SERIES_RE.test(f.filename)) ? 'Series' : 'Movie';
+          }
+          return {
+            full_url: f.full_url,
+            filename: f.filename,
+            parent_url: item.url,
+            folder: folderName,
+            server_name: server ? server.name : serverLabel(item.url),
+            file_type_category: category,
+            video_type: videoType,
+            ext,
+            size_bytes: f.size_bytes || null,
+            modified: f.date_iso || null,
+            last_indexed_date: now
+          };
+        });
+        directories = (res.directories || []).filter(d => d.startsWith(item.root) && d.length > item.url.length);
+      } else {
+        throw new Error('FTP crawling requires the standalone desktop application.');
       }
-      if (crawl.settings.deepStreamUnlimited || item.depth < crawl.settings.deepStreamMaxDepth) {
-        for (const subUrl of extra.subpages) {
-          if (shouldEnqueueSubpage(subUrl, item.root, item.depth, crawl.settings)) {
-            enqueue({ url: subUrl, depth: item.depth + 1, root: item.root, isSubpage: true, isExternal: !subUrl.startsWith(item.root) });
+    } else {
+      const { text: html, url: finalUrl } = await fetchText(item.url);
+      // Redirects are followed, but never out of the server root (unless allowed 1-hop external stream page).
+      if (!finalUrl.startsWith(item.root) && !item.isExternal) throw new Error(`Redirected outside root (${finalUrl})`);
+      if (finalUrl !== item.url) crawl.visited.add(finalUrl);
+      const parsed = parseListing(finalUrl, html, item.root, server ? server.name : serverLabel(item.url));
+      files = parsed.files;
+      directories = parsed.directories;
+
+      if (item.isSubpage) {
+        crawl.stats.deepSearches++;
+      }
+
+      if (crawl.settings && crawl.settings.deepStreamResolveEnabled) {
+        const extra = extractStreamLinksFromHtml(finalUrl, html, item.root, server ? server.name : serverLabel(item.url));
+        for (const f of extra.files) {
+          if (!files.some(existing => existing.full_url === f.full_url)) {
+            files.push(f);
+          }
+        }
+        if (crawl.settings.deepStreamUnlimited || item.depth < crawl.settings.deepStreamMaxDepth) {
+          for (const subUrl of extra.subpages) {
+            if (shouldEnqueueSubpage(subUrl, item.root, item.depth, crawl.settings)) {
+              enqueue({ url: subUrl, depth: item.depth + 1, root: item.root, isSubpage: true, isExternal: !subUrl.startsWith(item.root) });
+            }
           }
         }
       }
@@ -1159,7 +1211,18 @@ function parseListing(baseUrl, html, rootUrl, serverName) {
 
 async function testServer(url) {
   const root = toRoot({ url, type: 'directory' });
-  if (!root) return { status: 'error', message: 'That is not a valid http(s) URL.' };
+  if (!root) return { status: 'error', message: 'That is not a valid http(s) or ftp URL.' };
+  const u = new URL(root.url);
+  if (u.protocol === 'ftp:' || u.protocol === 'ftps:') {
+    if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.testFtpServer) {
+      const res = await window.electronAPI.testFtpServer(root.url);
+      if (res && res.ok) {
+        return { status: 'ok', files: res.itemCount || 0, directories: 0, ms: res.latencyMs || 0 };
+      }
+      return { status: 'error', message: res ? (res.error || 'Failed to connect to FTP server') : 'FTP connection failed' };
+    }
+    return { status: 'error', message: 'FTP server testing requires the standalone desktop application.' };
+  }
   const started = Date.now();
   const { text: html, url: finalUrl } = await fetchText(root.url, { timeoutMs: 15000, retries: 0 });
   if (!finalUrl.startsWith(root.url)) return { status: 'error', message: `Redirects to ${finalUrl} — add that URL instead.` };
@@ -1184,6 +1247,9 @@ async function pageTest(url) {
 
 /** One CORS-unlocking rule per configured host so <video crossorigin> capture works. */
 async function syncDynamicRules() {
+  if (typeof chrome === 'undefined' || !chrome.declarativeNetRequest || !chrome.declarativeNetRequest.getDynamicRules) {
+    return;
+  }
   const servers = await getServers();
   const hosts = [];
   for (const s of servers) {

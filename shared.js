@@ -101,7 +101,7 @@ function normalizeServerUrl(input) {
   if (!/^[a-z]+:\/\//i.test(s)) s = 'http://' + s;
   let u;
   try { u = new URL(s); } catch (e) { return null; }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  if (u.protocol !== 'http:' && u.protocol !== 'https:' && u.protocol !== 'ftp:' && u.protocol !== 'ftps:') return null;
   u.hash = '';
   u.search = '';
   if (!u.pathname.endsWith('/')) u.pathname += '/';
@@ -116,10 +116,23 @@ function serverLabel(url) {
     const parts = host.split('.');
     const isIp = /^\d+(\.\d+){3}$/.test(host);
     const base = isIp || parts.length < 3 ? host : parts[0];
-    return u.port ? `${base}:${u.port}` : base;
+    const prefix = (u.protocol === 'ftp:' || u.protocol === 'ftps:') ? 'ftp:' : '';
+    return u.port ? `${prefix}${base}:${u.port}` : `${prefix}${base}`;
   } catch (e) {
     return url;
   }
+}
+
+/**
+ * Resolves media URL for playback and thumbnails. If running in Electron and
+ * the URL is FTP, route through the local range-supporting proxy.
+ */
+function resolveMediaUrl(url) {
+  if (!url) return '';
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.resolveMediaUrl === 'function') {
+    return window.electronAPI.resolveMediaUrl(url);
+  }
+  return url;
 }
 
 /** Origin match pattern used for optional host permissions. */
