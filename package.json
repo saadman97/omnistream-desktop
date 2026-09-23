@@ -1,9 +1,17 @@
 {
-  "name": "omnistream",
+  "name": "omnistream-desktop",
   "productName": "OmniStream",
   "version": "2.1.0",
-  "description": "Standalone desktop media directory and server browser with native FTP streaming support",
+  "description": "Cross-platform desktop media directory browser & native FTP video streaming player with HTTP 206 range seeking, crawler, and local library indexing",
   "main": "electron/main.js",
+  "homepage": "https://github.com/saadman97/omnistream-desktop#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saadman97/omnistream-desktop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saadman97/omnistream-desktop/issues"
+  },
   "scripts": {
     "start": "electron .",
     "build:app": "electron-builder --mac --dir --arm64",
@@ -16,10 +24,20 @@
   },
   "keywords": [
     "omnistream",
-    "ftp",
     "media-browser",
+    "media-player",
+    "ftp-streaming",
+    "ftp-client",
     "video-streamer",
-    "electron"
+    "open-directory",
+    "jellyfin-client",
+    "emby-client",
+    "electron",
+    "macos-app",
+    "desktop-app",
+    "hls-player",
+    "dash-player",
+    "range-requests"
   ],
   "author": "OmniStream Team",
   "license": "MIT",
